@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#101827">
+<title>Smart Battery Monitor | Distrik Navigasi</title>
+<style>
+:root{--bg:#0b1220;--panel:#121e31;--panel2:#17263c;--line:#263750;--text:#eaf1fa;--muted:#9aabc0;--blue:#60a5fa;--green:#34d399;--yellow:#fbbf24;--red:#fb7185}
+*{box-sizing:border-box}body{margin:0;padding:22px;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,sans-serif}
+.wrap{max-width:1080px;margin:auto;display:grid;gap:16px}.panel{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:18px;box-shadow:0 8px 24px #0002}
+header{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}.eyebrow{font-size:.72rem;letter-spacing:.12em;color:var(--blue);font-weight:800;text-transform:uppercase}h1{font-size:1.35rem;margin:5px 0}p{margin:5px 0;color:var(--muted);font-size:.88rem;line-height:1.5}
+.pill{border:1px solid var(--line);padding:7px 12px;border-radius:30px;font-weight:700;font-size:.76rem}.ok{color:var(--green);border-color:#1d694f;background:#103327}.warn{color:var(--yellow);border-color:#775a1b;background:#362b13}.bad{color:var(--red);border-color:#783447;background:#3a1c29}
+.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.metric small{color:var(--muted);font-weight:700;letter-spacing:.08em;text-transform:uppercase}.metric strong{display:block;font-size:clamp(1.8rem,4vw,2.6rem);margin-top:8px;letter-spacing:-.04em}.unit{font-size:.9rem;color:var(--muted);font-weight:600}.section-title{font-size:.92rem;font-weight:800;margin-bottom:13px}.row{display:flex;gap:10px;flex-wrap:wrap;align-items:end}.field{display:grid;gap:6px;flex:1;min-width:190px}label{font-size:.78rem;color:var(--muted);font-weight:700}input{width:100%;background:#0d1728;color:var(--text);border:1px solid var(--line);border-radius:9px;padding:11px;font-size:.9rem;outline:none}input:focus{border-color:var(--blue)}button{border:0;border-radius:10px;padding:11px 15px;font-weight:800;color:#07111f;background:var(--blue);cursor:pointer}button:disabled{opacity:.45;cursor:not-allowed}.btn-dark{background:#35465e;color:var(--text)}.btn-green{background:var(--green)}.btn-yellow{background:var(--yellow)}.status{padding:15px;border:1px solid var(--line);border-radius:12px;background:#0e192a}.status strong{font-size:1.08rem}.meta{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.meta div{padding:11px;background:var(--panel2);border-radius:10px}.meta small{display:block;color:var(--muted);font-size:.72rem}.meta b{display:block;margin-top:4px;font-size:.88rem;overflow-wrap:anywhere}canvas{width:100%;height:180px;display:block}.note{font-size:.78rem;color:var(--muted);border-left:3px solid var(--yellow);padding:9px 12px;background:#2b2415;border-radius:5px}
+@media(max-width:700px){body{padding:12px}.grid{grid-template-columns:1fr}.meta{grid-template-columns:1fr 1fr}.panel{padding:14px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="panel">
+    <div><div class="eyebrow">IoT · Monitoring Perangkat Navigasi</div><h1>Smart Battery Monitor</h1><p>Pemantauan awal aki untuk buoy dan menara suar · ESP32 + INA219</p></div>
+    <span id="connection" class="pill warn">MENGHUBUNGKAN</span>
+  </header>
+
+  <section class="panel">
+    <div class="section-title">Koneksi perangkat ESP32</div>
+    <div class="row">
+      <div class="field"><label for="deviceUrl">Alamat ESP32 pada Wi-Fi lokal</label><input id="deviceUrl" inputmode="url" placeholder="http://192.168.1.123"></div>
+      <button class="btn-dark" onclick="saveDeviceUrl()">Hubungkan perangkat</button>
+    </div>
+    <p>Komputer/ponsel harus berada pada jaringan Wi-Fi yang sama dengan ESP32. Saat halaman GitHub dibuka melalui HTTPS, browser dapat meminta izin akses jaringan lokal. Izinkan hanya untuk dashboard proyek ini.</p>
+  </section>
+
+  <section class="grid">
+    <div class="panel metric"><small>Tegangan terukur</small><strong><span id="voltage">0.000</span> <span class="unit">V</span></strong></div>
+    <div class="panel metric"><small>Arus terukur</small><strong><span id="current">0.00</span> <span class="unit">mA</span></strong></div>
+    <div class="panel metric"><small>Daya terukur</small><strong><span id="power">0.000</span> <span class="unit">W</span></strong></div>
+  </section>
+
+  <section class="panel">
+    <div class="section-title">Status sistem dan hasil pembacaan</div>
+    <div class="status"><strong id="statusText">Menunggu data sensor...</strong><p id="statusDescription">Status ini menunjukkan kualitas pembacaan, bukan diagnosis kesehatan aki.</p></div>
+    <div class="meta" style="margin-top:12px">
+      <div><small>Sensor INA219</small><b id="sensorState">-</b></div>
+      <div><small>Wi-Fi / IP</small><b id="networkState">-</b></div>
+      <div><small>Relay</small><b id="relayState">OFF</b></div>
+      <div><small>Rentang arus</small><b id="currentRange">-</b></div>
+      <div><small>Status Google Sheets</small><b id="cloudState">Belum ada sinkronisasi</b></div>
+      <div><small>Pembaruan terakhir</small><b id="lastUpdate">-</b></div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="section-title">Grafik tegangan (60 pembacaan terakhir pada dashboard)</div>
+    <canvas id="voltageChart" width="900" height="220"></canvas>
+    <p>Grafik ini bersifat sementara pada browser. Riwayat permanen disimpan melalui Google Sheets.</p>
+  </section>
+
+  <section class="panel">
+    <div class="section-title">Identitas pemeriksaan</div>
+    <div class="row">
+      <div class="field"><label for="batteryId">ID aki / kode inventaris</label><input id="batteryId" maxlength="30" placeholder="Contoh: AKI-BUOY-001"></div>
+      <div class="field"><label for="location">Lokasi penggunaan</label><input id="location" maxlength="38" placeholder="Contoh: Buoy / Menara Suar ..."></div>
+    </div>
+    <div class="row" style="margin-top:12px">
+      <div class="field"><label for="apiKey">API Key perangkat</label><input id="apiKey" type="password" autocomplete="off" placeholder="Masukkan token dari konfigurasi firmware"></div>
+      <button class="btn-dark" onclick="saveToken()">Simpan token sesi</button>
+    </div>
+    <p>Token hanya disimpan dalam sesi tab browser. Jangan bagikan token atau source firmware yang berisi kredensial.</p>
+  </section>
+
+  <section class="panel">
+    <div class="section-title">Kontrol perangkat</div>
+    <div class="row">
+      <button id="relayButton" class="btn-dark" onclick="toggleRelay()">RELAY: OFF</button>
+      <button class="btn-green" onclick="syncLog()">Simpan pembacaan ke Sheets</button>
+      <button class="btn-dark" onclick="refreshNow()">Perbarui data</button>
+    </div>
+    <p>Relay dimulai OFF. Aktifkan hanya setelah fungsi relay dan rangkaian yang dikendalikan telah diperiksa serta diizinkan pembimbing.</p>
+  </section>
+
+  <div class="note">Keamanan: jangan memasukkan API_TOKEN atau GOOGLE_SHEETS_TOKEN ke source HTML/JavaScript. API Key dimasukkan oleh operator pada kolom di atas dan hanya disimpan selama sesi tab. Jangan mengunggah informasi inventaris/lokasi operasional tanpa persetujuan instansi.<br><br>Batas penggunaan: perangkat ini memantau tegangan, arus, dan daya. Jenis kimia aki belum diidentifikasi, sehingga dashboard tidak memberikan label sehat/rusak, SOC, SOH, kapasitas Ah, atau CCA.</div>
+  <footer><p>Smart Battery Monitor · Proyek PKL · Data harus diverifikasi dengan alat ukur pembanding dan prosedur teknisi.</p></footer>
+</div>
+<script>
+const historyV=[];let latestRelay=false;let polling=false;
+function deviceBase(){return (document.getElementById('deviceUrl').value.trim()||localStorage.getItem('batteryDeviceUrl')||'').replace(/\/+$/,'')}
+function saveDeviceUrl(){const raw=document.getElementById('deviceUrl').value.trim();try{const u=new URL(raw);if(u.protocol!=='http:'||!u.hostname)throw new Error('Gunakan alamat ESP32 lokal dengan format http://IP-ESP32');localStorage.setItem('batteryDeviceUrl',u.origin);document.getElementById('deviceUrl').value=u.origin;fetchStatus()}catch(e){alert(e.message||'Alamat perangkat tidak valid.')}}
+async function fetchDevice(path,options={}){const base=deviceBase();if(!base)throw new Error('Masukkan alamat ESP32. Lihat IP pada LCD atau Serial Monitor 115200 baud.');const opts={...options,mode:'cors',targetAddressSpace:'local'};return fetch(base+path,opts)}
+function token(){return document.getElementById('apiKey').value.trim()||sessionStorage.getItem('batteryApiToken')||''}
+function saveToken(){const v=document.getElementById('apiKey').value.trim();if(v.length<24){alert('Token belum diisi atau terlalu pendek. Periksa API_TOKEN pada firmware.');return}sessionStorage.setItem('batteryApiToken',v);alert('Token disimpan untuk sesi tab ini.')}
+function authHeaders(){return {'X-API-Key':token(),'Content-Type':'application/x-www-form-urlencoded'}}
+function setPill(el,text,kind){el.textContent=text;el.className='pill '+kind}
+function statusInfo(code){const map={
+ 'MONITORING_AKTIF':['MONITORING AKTIF','Pembacaan sensor tersedia. Ini bukan penilaian kesehatan aki.','ok'],
+ 'ARUS_DI_LUAR_RENTANG_KALIBRASI':['PERIKSA RENTANG ARUS','Arus melewati rentang konfigurasi INA219 2 A; nilai arus/daya dapat tidak akurat.','warn'],
+ 'INPUT_AKI_TIDAK_TERDETEKSI':['INPUT TEGANGAN TIDAK TERDETEKSI','Periksa keberadaan input dan jalur pengukuran bersama pembimbing.','bad'],
+ 'TEGANGAN_MELAMPAUI_BATAS':['TEGANGAN MELEBIHI BATAS MODUL','Hentikan penggunaan dan minta pembimbing memeriksa spesifikasi sumber serta modul INA219.','bad'],
+ 'SENSOR_TIDAK_TERDETEKSI':['SENSOR TIDAK TERDETEKSI','INA219 belum terinisialisasi.','bad'],
+ 'PEMBACAAN_SENSOR_GAGAL':['PEMBACAAN SENSOR GAGAL','Periksa koneksi I2C dan modul INA219.','bad']};return map[code]||['STATUS TIDAK DIKENAL',code,'warn']}
+function drawChart(){const c=document.getElementById('voltageChart'),ctx=c.getContext('2d'),w=c.width,h=c.height;ctx.clearRect(0,0,w,h);ctx.strokeStyle='#293b54';ctx.lineWidth=1;for(let i=1;i<5;i++){let y=i*h/5;ctx.beginPath();ctx.moveTo(35,y);ctx.lineTo(w-10,y);ctx.stroke()}if(historyV.length<2){ctx.fillStyle='#9aabc0';ctx.font='16px sans-serif';ctx.fillText('Menunggu data pembacaan...',40,45);return}const vals=historyV.map(x=>x.v),min=Math.min(...vals)-.1,max=Math.max(...vals)+.1,range=Math.max(.2,max-min);ctx.strokeStyle='#60a5fa';ctx.lineWidth=3;ctx.beginPath();historyV.forEach((p,i)=>{let x=35+i*(w-50)/(historyV.length-1),y=h-18-((p.v-min)/range)*(h-40);i?ctx.lineTo(x,y):ctx.moveTo(x,y)});ctx.stroke();ctx.fillStyle='#9aabc0';ctx.font='13px sans-serif';ctx.fillText(max.toFixed(2)+' V',4,17);ctx.fillText(min.toFixed(2)+' V',4,h-5)}
+async function fetchStatus(){if(polling)return;polling=true;try{const res=await fetchDevice('/api/status',{cache:'no-store'});if(!res.ok)throw new Error('HTTP '+res.status);const d=await res.json();latestRelay=!!d.relay;
+document.getElementById('voltage').textContent=Number(d.voltage).toFixed(3);document.getElementById('current').textContent=Number(d.current).toFixed(2);document.getElementById('power').textContent=Number(d.power).toFixed(3);
+const info=statusInfo(d.status);document.getElementById('statusText').textContent=info[0];document.getElementById('statusDescription').textContent=info[1];
+document.getElementById('statusText').style.color=info[2]==='ok'?'#34d399':info[2]==='bad'?'#fb7185':'#fbbf24';
+document.getElementById('sensorState').textContent=d.sensor_ok?'OK':(d.sensor_connected?'Pembacaan gagal':'Tidak terdeteksi');document.getElementById('networkState').textContent=d.wifi?'ONLINE · '+d.ip:'OFFLINE';document.getElementById('relayState').textContent=d.relay?'ON':'OFF';document.getElementById('currentRange').textContent=d.current_in_range?'Dalam rentang konfigurasi':'Di luar rentang';document.getElementById('cloudState').textContent=d.cloud;
+setPill(document.getElementById('connection'),d.wifi?'PERANGKAT ONLINE':'WIFI OFFLINE',d.wifi?'ok':'warn');
+const b=document.getElementById('relayButton');b.textContent=d.relay?'RELAY: ON':'RELAY: OFF';b.className=d.relay?'btn-yellow':'btn-dark';
+if(d.voltage_valid){historyV.push({v:Number(d.voltage)});if(historyV.length>60)historyV.shift();drawChart()}
+document.getElementById('lastUpdate').textContent=new Date().toLocaleTimeString('id-ID');
+if(d.battery_id&&d.battery_id!=='BELUM_DIISI'&&!document.getElementById('batteryId').value)document.getElementById('batteryId').value=d.battery_id;
+if(d.location&&d.location!=='BELUM_DIISI'&&!document.getElementById('location').value)document.getElementById('location').value=d.location;
+}catch(e){setPill(document.getElementById('connection'),'KONEKSI DASHBOARD GAGAL','bad');document.getElementById('statusText').textContent='Tidak dapat mengambil data dari ESP32';document.getElementById('statusDescription').textContent=e.message}finally{polling=false}}
+async function postApi(path,body){const key=token();if(key.length<24)throw new Error('Masukkan API Key yang sesuai dengan firmware terlebih dahulu.');const response=await fetchDevice(path,{method:'POST',headers:authHeaders(),body:new URLSearchParams(body)});const data=await response.json();if(!response.ok)throw new Error(data.message||('HTTP '+response.status));return data}
+async function toggleRelay(){const target=latestRelay?'0':'1';if(target==='1'&&!confirm('Relay akan diaktifkan. Pastikan rangkaian, beban, rating, dan izin pembimbing sudah diverifikasi. Lanjutkan?'))return;try{await postApi('/api/relay',{state:target});await fetchStatus()}catch(e){alert(e.message)}}
+async function syncLog(){try{const batteryId=document.getElementById('batteryId').value.trim()||'BELUM_DIISI';const location=document.getElementById('location').value.trim()||'BELUM_DIISI';await postApi('/api/log',{battery_id:batteryId,location:location});alert('Pembacaan dimasukkan ke antrean pengiriman Google Sheets. Periksa status cloud.');await fetchStatus()}catch(e){alert(e.message)}}
+function refreshNow(){fetchStatus()}
+const saved=sessionStorage.getItem('batteryApiToken');if(saved)document.getElementById('apiKey').value=saved;
+const savedDevice=localStorage.getItem('batteryDeviceUrl');if(savedDevice)document.getElementById('deviceUrl').value=savedDevice;
+drawChart();if(savedDevice)fetchStatus();setInterval(()=>{if(deviceBase())fetchStatus()},2000);
+</script>
+</body>
+</html>
